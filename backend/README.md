@@ -33,6 +33,29 @@ If the ODBC driver is not available (CI, or a quick local run), set
 `VANGUARD_USE_SQLITE=true` and everything works against a local SQLite file.
 `VANGUARD_DATABASE_URL` overrides both.
 
+### Migrations
+
+The schema is owned by Alembic. Create the tables with:
+
+```bash
+alembic upgrade head
+```
+
+After changing a model, generate and review a migration:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+alembic downgrade -1          # roll back one revision
+```
+
+`tests/test_migrations.py` fails if the migrations and the models drift apart,
+so a forgotten migration is caught in CI rather than in production.
+
+In development `create_all` still runs at startup for convenience. In
+production (`VANGUARD_ENVIRONMENT=production`) it is skipped deliberately:
+`create_all` creates missing tables but never alters existing ones, so relying
+on it would silently leave the database behind the models.
+
 ### Seed and run
 
 ```bash
@@ -46,7 +69,7 @@ Interactive API docs: <http://127.0.0.1:8000/docs>
 ## Tests
 
 ```bash
-pytest                    # 23 tests, runs against SQLite
+pytest                    # 35 tests, runs against SQLite
 ```
 
 ## API
@@ -88,3 +111,28 @@ stored or served without them.
 
 **Passwords** are bcrypt-hashed and capped at 72 bytes, which is bcrypt's own
 limit — longer input is rejected rather than silently truncated.
+
+## Before deploying
+
+Set `VANGUARD_ENVIRONMENT=production`. That turns on two safeguards:
+
+1. **The app refuses to start** unless `VANGUARD_SECRET_KEY` is set to
+   something other than the shipped placeholder and at least 32 characters
+   long. Anyone who has read this repository knows the placeholder and could
+   forge a login token with it, so this is a hard failure rather than a
+   warning. Generate a key with:
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+2. **`create_all` is skipped** — run `alembic upgrade head` as part of your
+   deploy.
+
+**Rate limiting.** `/macros/search` and `/macros/barcode` each turn one inbound
+request into one outbound call to the free OpenFoodFacts API, so both are
+limited per user (default 30 requests per 60 seconds, configurable). Over the
+limit returns `429` with a `Retry-After` header and makes no outbound call.
+
+The counter lives in process memory. With N Uvicorn workers the effective limit
+is therefore `N x limit` — it still bounds the traffic, but it is not an exact
+global limit. For an exact limit across workers or hosts, move the counter in
+`app/ratelimit.py` into Redis; the interface is designed for that swap.

@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Refuses to start in production with a forgeable JWT signing key.
+    settings.enforce_production_safety()
     init_db()
     logger.info("Database ready at %s", settings.sqlalchemy_url.split("://")[0])
     yield

@@ -20,6 +20,7 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env                  # fill in your SQL Server details
+alembic upgrade head                  # create the schema
 python seed.py                        # 10 exercises + 10 compound profiles
 uvicorn app.main:app --reload         # http://127.0.0.1:8000/docs
 ```
@@ -33,6 +34,10 @@ npm run dev                           # http://localhost:5173
 
 No SQL Server handy? Set `VANGUARD_USE_SQLITE=true` in `backend/.env` and both
 the seed script and the API run against a local SQLite file instead.
+
+**Deploying?** Set `VANGUARD_ENVIRONMENT=production` and a real
+`VANGUARD_SECRET_KEY` — the app refuses to start without one. See
+[`backend/README.md`](backend/README.md#before-deploying).
 
 Per-directory detail lives in [`backend/README.md`](backend/README.md) and
 [`frontend/README.md`](frontend/README.md).
@@ -68,6 +73,6 @@ rather than a forum. Nothing here is medical advice.
 ## Testing
 
 ```bash
-cd backend && pytest      # 23 tests: auth, ownership scoping, aggregation, parsing
+cd backend && pytest      # 35 tests: auth, scoping, aggregation, parsing, migrations, rate limits
 cd frontend && npm run lint && npm run build
 ```

@@ -5,10 +5,19 @@ The production target is Microsoft SQL Server 2022 over ``pyodbc``; a SQLite
 fallback keeps the app runnable on machines without the MS ODBC driver.
 """
 
+import logging
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+# Shipped placeholder. Anyone reading the repository knows it, so a token
+# signed with it can be forged by anyone — production must override it.
+PLACEHOLDER_SECRET_KEY = "change-me-in-production-please-use-a-long-random-value"
+MIN_SECRET_KEY_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -16,11 +25,12 @@ class Settings(BaseSettings):
 
     # --- App ---
     app_name: str = "Vanguard Fitness API"
+    environment: Literal["development", "production"] = "development"
     api_v1_prefix: str = "/api"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Auth ---
-    secret_key: str = "change-me-in-production-please-use-a-long-random-value"
+    secret_key: str = PLACEHOLDER_SECRET_KEY
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
 
@@ -39,6 +49,10 @@ class Settings(BaseSettings):
     use_sqlite: bool = False
     sqlite_path: str = "./vanguard_fitness.db"
     database_url: str | None = None
+
+    # --- Rate limiting (outbound OpenFoodFacts calls) ---
+    openfoodfacts_rate_limit_requests: int = 30
+    openfoodfacts_rate_limit_window_seconds: int = 60
 
     # --- External API ---
     openfoodfacts_base_url: str = "https://world.openfoodfacts.org"
@@ -69,6 +83,41 @@ class Settings(BaseSettings):
             f"TrustServerCertificate={'yes' if self.db_trust_server_certificate else 'no'};"
         )
         return f"mssql+pyodbc:///?odbc_connect={quote_plus(odbc)}"
+
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
+    def secret_key_problem(self) -> str | None:
+        """Describe why the signing key is unsafe, or ``None`` when it is fine."""
+        if self.secret_key == PLACEHOLDER_SECRET_KEY:
+            return "VANGUARD_SECRET_KEY is still the shipped placeholder value"
+        if len(self.secret_key) < MIN_SECRET_KEY_LENGTH:
+            return (
+                f"VANGUARD_SECRET_KEY is only {len(self.secret_key)} characters; "
+                f"at least {MIN_SECRET_KEY_LENGTH} are required"
+            )
+        return None
+
+    def enforce_production_safety(self) -> None:
+        """Refuse to start in production with a forgeable signing key.
+
+        A placeholder key means anyone who has read this repository can mint a
+        valid login token for any account, so this is a hard failure rather
+        than a warning. In development it only logs.
+        """
+        problem = self.secret_key_problem()
+        if problem is None:
+            return
+        message = (
+            f"Insecure configuration: {problem}. "
+            "Generate one with:  python -c \"import secrets; print(secrets.token_hex(32))\"  "
+            "and set it as VANGUARD_SECRET_KEY."
+        )
+        if self.is_production:
+            raise RuntimeError(message)
+        logger.warning("%s (allowed because VANGUARD_ENVIRONMENT=development)", message)
 
 
 @lru_cache

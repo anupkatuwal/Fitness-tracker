@@ -1,11 +1,14 @@
 """SQLAlchemy 2.0 engine, session factory and declarative base."""
 
+import logging
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -36,7 +39,18 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """Create every table declared on ``Base``."""
+    """Create tables for local development and tests.
+
+    In production this is a no-op on purpose: the schema is owned by Alembic
+    (``alembic upgrade head``). ``create_all`` only ever creates missing
+    tables — it never alters an existing one — so relying on it in production
+    silently leaves the database behind the models the first time a column
+    changes.
+    """
     from app import models  # noqa: F401  (registers the mappers)
+
+    if settings.is_production:
+        logger.info("Production mode: schema is managed by Alembic, skipping create_all.")
+        return
 
     Base.metadata.create_all(bind=engine)

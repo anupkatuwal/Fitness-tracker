@@ -2,10 +2,11 @@
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import delete, func, select
 
 from app.deps import CurrentUser, DbSession
+from app.ratelimit import limit_openfoodfacts
 from app.models import MacroLog
 from app.schemas import (
     DailySummary,
@@ -33,7 +34,11 @@ def _goals(user) -> MacroTotals:
 
 
 # ------------------------------------------------------------------ external search
-@router.get("/search", response_model=FoodSearchResponse)
+@router.get(
+    "/search",
+    response_model=FoodSearchResponse,
+    dependencies=[Depends(limit_openfoodfacts)],
+)
 async def search_foods(
     current_user: CurrentUser,
     q: str = Query(min_length=2, max_length=128, description="Food search term"),
@@ -44,7 +49,11 @@ async def search_foods(
     return FoodSearchResponse(query=q, count=len(results), results=results)
 
 
-@router.get("/barcode/{barcode}", response_model=FoodSearchResult)
+@router.get(
+    "/barcode/{barcode}",
+    response_model=FoodSearchResult,
+    dependencies=[Depends(limit_openfoodfacts)],
+)
 async def lookup_barcode(barcode: str, current_user: CurrentUser) -> FoodSearchResult:
     product = await openfoodfacts.get_food_by_barcode(barcode)
     if product is None:
