@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+
+/* Tailwind v4 CSS-first theme. These tokens generate the utility classes
+   (bg-surface, text-accent, ...) used across the app. */
+@theme {
+  --color-ink: #05080c;
+  --color-base: #0b0f14;
+  --color-surface: #121821;
+  --color-surface-2: #1a222e;
+  --color-line: #26303d;
+
+  --color-accent: #22d3ee;
+  --color-accent-strong: #06b6d4;
+
+  /* Chart series. These are the validated dark-surface categorical steps -
+     the ordering is the colour-blind-safety mechanism, not a cosmetic choice.
+     Verified against surface #121821: lightness band, chroma floor, CVD
+     separation, normal-vision separation and 3:1 contrast all pass. */
+  --color-protein: #3987e5;
+  --color-carbs: #d95926;
+  --color-fats: #199e70;
+  --color-fiber: #c98500;
+  --color-calories: #d55181;
+
+  --color-hazard: #ef4444;
+  --color-hazard-deep: #7f1d1d;
+  --color-warn: #f59e0b;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-base);
+  color: #e6edf5;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible focus ring for keyboard users on every interactive element. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #38455a;
+}
